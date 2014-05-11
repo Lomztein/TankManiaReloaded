@@ -10,6 +10,11 @@ public class BulletScript : MonoBehaviour {
 	public SpriteRenderer sprite;
 
 	public bool modifySize;
+	public bool piercing;
+	public bool homing;
+	public float turnSpeed;
+	public float maxTime = 20;
+	public Transform target;
 
 	void Start () {
 		Transform spriteT = transform.FindChild ("Sprite");
@@ -24,27 +29,48 @@ public class BulletScript : MonoBehaviour {
 		}
 		Ray ray = new Ray (parent.weaponPos.position,velocity);
 		RaycastHit hit;
-		if (Physics.Raycast (ray, out hit, 0.8f + velocity.magnitude * Time.fixedDeltaTime)) {
-			if (hitParticle) { networkView.RPC ("Hit",RPCMode.All, hit.point); }
-			if (hit.collider.GetComponent<HealthScript>()) {
-				if (hit.collider.networkView) { hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,damage); }
+		if (Network.isServer) {
+			if (Physics.Raycast (ray, out hit, 0.8f + velocity.magnitude * Time.fixedDeltaTime)) {
+				if (hitParticle) { networkView.RPC ("Hit",RPCMode.All, hit.point); }
+				if (hit.collider.GetComponent<HealthScript>()) {
+					if (hit.collider.networkView) { hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,damage,parent.networkView.viewID); }
+				}
+				if (!piercing) {
+					Network.Destroy (gameObject);
+				}
 			}
-			Network.Destroy (gameObject);
 		}
 	}
 
 	void FixedUpdate () {
-
-		transform.position += velocity * Time.fixedDeltaTime;
+		Ray ray = new Ray (transform.position,velocity);
+		if (homing) {
+			if (target) {
+				ray = new Ray (transform.position,transform.right);
+				float angle = Mathf.Atan2(target.position.y-transform.position.y, target.position.x-transform.position.x)*180 / Mathf.PI;
+				Quaternion newDir = Quaternion.Euler(0f,0f,angle);
+				transform.rotation = Quaternion.RotateTowards (transform.rotation,newDir,turnSpeed * Time.fixedDeltaTime);
+				transform.position += transform.right * velocity.magnitude * Time.fixedDeltaTime;
+			}else{
+				transform.position += velocity * Time.fixedDeltaTime;
+			}
+		}else{
+			transform.position += velocity * Time.fixedDeltaTime;
+		}
 		if (Network.isServer) {
-			Ray ray = new Ray (transform.position,velocity);
+			maxTime -= Time.fixedDeltaTime;
+			if (maxTime < 0) { Network.Destroy (gameObject); }
 			RaycastHit hit;
 			if (Physics.Raycast (ray, out hit, velocity.magnitude * Time.fixedDeltaTime)) {
 				if (hitParticle) { networkView.RPC ("Hit",RPCMode.All, hit.point); }
 				if (hit.collider.GetComponent<HealthScript>()) {
-					if (hit.collider.networkView) { hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,damage); }
+					if (hit.collider.networkView) { hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,damage,parent.networkView.viewID); }
 				}
-				Network.Destroy (gameObject);
+				if (!piercing) {
+					Network.Destroy (gameObject);
+				}else{
+					damage -= damage*Time.fixedDeltaTime*20;
+				}
 			}
 		}
 	}

@@ -26,7 +26,7 @@ public class LaserScript : MonoBehaviour {
 			if (Physics.Raycast (ray,out hit,Mathf.Infinity)) {
 				end = hit.point;
 				if (hit.collider.GetComponent<HealthScript>()) {
-					hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,bullet.damage);
+					hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,bullet.damage,bullet.parent.networkView.viewID);
 					line.SetPosition (0,start);
 					line.SetPosition (1,end);
 				}

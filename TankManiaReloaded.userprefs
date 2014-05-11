@@ -1,0 +1,24 @@
+﻿<Properties>
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" PreferredExecutionTarget="MonoDevelop.Default" />
+  <MonoDevelop.Ide.Workbench ActiveDocument="Assets\Scripts\NetworkManager.cs">
+    <Files>
+      <File FileName="Assets\Scripts\NetworkManager.cs" Line="216" Column="6" />
+      <File FileName="Assets\Scripts\PlayerController.cs" Line="123" Column="29" />
+      <File FileName="Assets\Scripts\ParticleScript.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\NetworkManager.cs" Line="235" Column="36" />
+      <File FileName="Assets\Scripts\GlobalManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletScript.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\WeaponScript.cs" Line="90" Column="59" />
+      <File FileName="Assets\Scripts\HealthScript.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\LaserScript.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\GranadeScript.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BonusScript.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\RandomMapGenerator.cs" Line="63" Column="42" />
+      <File FileName="Assets\Scripts\NetworkCharacter.cs" Line="42" Column="30" />
+    </Files>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+</Properties>

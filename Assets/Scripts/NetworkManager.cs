@@ -3,10 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 
 public class NetworkManager : MonoBehaviour {
-	
+		
 	public Rect bs;
 	public float buttonDistance;
 	public string gameType = "TankMania II";
+	public int maxConnections = 1;
 	public bool refreshing = false;
 	public HostData[] hostData;
 	public GameObject player;
@@ -20,6 +21,7 @@ public class NetworkManager : MonoBehaviour {
 	public List<string> names;
 
 	public bool chatOpen;
+	public string currentMessage;
 	public List<string> chat;
 	public List<float> chatTime;
 	public int maxChatLength;
@@ -27,11 +29,11 @@ public class NetworkManager : MonoBehaviour {
 
 	void Start () {
 		NetworkManager.current = this;
-		localName = "Player" + Random.Range (0,9999);
+		localName = PlayerPrefs.GetString ("PlayerName","Player" + Random.Range (0,9999));
 	}
 	
 	void StartServer () {
-		Network.InitializeServer(2,8008,!Network.HavePublicAddress());
+		Network.InitializeServer(maxConnections,8008,!Network.HavePublicAddress());
 		MasterServer.RegisterHost(gameType,"SERVER_" + Random.Range (0,1000).ToString ());
 	}
 	
@@ -39,6 +41,16 @@ public class NetworkManager : MonoBehaviour {
 		hostData = new HostData[0];
 		MasterServer.RequestHostList(gameType);
 		refreshing = true;
+	}
+
+	[RPC] void RequestPlayerData (NetworkMessageInfo info) {
+		for (int i=0;i<names.Count;i++) {
+			networkView.RPC ("GetPlayerData",info.sender,names[i]);
+		}
+	}
+
+	[RPC] void GetPlayerData (string newName) {
+		names.Add (newName);
 	}
 	
 	void Update () {
@@ -48,8 +60,28 @@ public class NetworkManager : MonoBehaviour {
 				hostData = MasterServer.PollHostList ();
 			}
 		}
-		if (Input.GetButtonDown ("Jump")) {
-			networkView.RPC ("SendChat",RPCMode.All,localName,"Hi! My name is " + localName);
+		if (Input.GetButtonDown ("Enter")) {
+			if (chatOpen) {
+				if (currentMessage != "") {
+					networkView.RPC ("SendChat",RPCMode.All,"[" + localName + "] - " + currentMessage);
+				}
+				currentMessage = "";
+				chatOpen = false;
+			}else{
+				chatOpen = true;
+			}
+		}
+		if (chatOpen) {
+			string input = Input.inputString;
+			foreach (char c in input) {
+				if (c == "\b"[0]) {
+					if (currentMessage.Length != 0) {
+						currentMessage = currentMessage.Substring (0,currentMessage.Length-1);
+					}
+				}else{
+					currentMessage += c.ToString();
+				}
+			}
 		}
 		for (int i=0;i<chat.Count;i++) {
 			chatTime[i] -= Time.deltaTime;
@@ -71,7 +103,10 @@ public class NetworkManager : MonoBehaviour {
 	
 	void OnConnectedToServer () {
 		status = ("Connected to server!");
-		networkView.RPC ("AddPlayer",RPCMode.AllBuffered,localName);
+		networkView.RPC ("RequestPlayerData",RPCMode.Server);
+		networkView.RPC ("AddPlayer",RPCMode.All,localName);
+		PlayerPrefs.SetString ("PlayerName",localName);
+		PlayerPrefs.Save();
 	}
 
 	void OnFailedToConnect (NetworkConnectionError error) {
@@ -80,7 +115,6 @@ public class NetworkManager : MonoBehaviour {
 
 	[RPC] void AddPlayer (string newName, NetworkMessageInfo info) {
 		names.Add (newName);
-		networkView.RPC ("GetIndex",info.sender,names.Count-1);
 	}
 
 	[RPC] void RemovePlayer (int index) {
@@ -93,30 +127,53 @@ public class NetworkManager : MonoBehaviour {
 
 	public void SpawnPlayer () {
 		Vector3 newPos = Vector3.zero;
-		if (Network.isServer) {
-			newPos = GlobalManager.current.spawnPoints[0].position;
+		if (GlobalManager.current.mapIndex != 0) {
+			if (Network.isServer) {
+				newPos = GlobalManager.current.spawnPoints[0].position;
+			}else{
+				newPos = GlobalManager.current.spawnPoints[1].position;
+			}
 		}else{
-			newPos = GlobalManager.current.spawnPoints[1].position;
+			newPos = GlobalManager.current.spawnPoints[0].position;
 		}
 		GameObject newP = (GameObject)Network.Instantiate (player,newPos,Quaternion.identity,0);
 		newP.networkView.RPC ("ChangeName",RPCMode.All,localName);
+		newP.networkView.RPC ("GetPlayer",RPCMode.All,Network.player);
+		GlobalManager.current.networkView.RPC ("GetPlayer",RPCMode.All,newP.networkView.viewID);
+		GlobalManager.current.localPlayer = newP.GetComponent<PlayerController>();
 	}
 
 	[RPC] void StartGame () {
-		SpawnPlayer ();
+		gameStarted = true;
+		Invoke ("SpawnPlayer",0.5f);
 	}
 
 	[RPC] void SendPlayerData (int index, string newName) {
 		names.Add (newName);
 	}
 
-	[RPC] void SendChat (string playerName, string newChat) {
-		chat.Add ("[" + playerName + "] - " + newChat);
+	[RPC] void SendChat (string newChat) {
+		chat.Add (newChat);
 		chatTime.Add (maxChatTime);
 		if (chat.Count > maxChatLength) {
 			chat.RemoveAt (0);
 		}
 	}
+
+	void OnDisconnectedFromServer () {
+		Destroy(GlobalManager.current.curMap);
+		foreach (PlayerController p in GlobalManager.current.players) {
+			Destroy (p.gameObject);
+		}
+		Camera.main.transform.position = Vector3.back * 10;
+	}
+
+	void OnPlayerDisconnected (NetworkPlayer p) {
+		Network.RemoveRPCs (p);
+		Network.DestroyPlayerObjects(p);
+		networkView.RPC ("ShortenPlayerList",RPCMode.All);																															
+	}
+
 	void OnGUI () {
 		if (gameStarted == false) {
 			GUI.Box (new Rect(bs.x + buttonDistance + bs.width,bs.y + ( buttonDistance + bs.height/2 ) * statusPos+1,Screen.width - bs.width - buttonDistance - bs.x*2,bs.height/2),status);
@@ -154,6 +211,12 @@ public class NetworkManager : MonoBehaviour {
 					GUI.Box (new Rect (bs.width + buttonDistance*2,bs.y + (i*(bs.height/2 + buttonDistance)),Screen.width-buttonDistance*3-bs.width,bs.height/2),names[i]);
 					statusPos = names.Count;
 				}
+				if (GUI.Button (new Rect (buttonDistance,Screen.height-bs.height-buttonDistance,bs.width,bs.height),"QUIT")) {
+					Network.Disconnect ();
+				}
+			}
+			if (chatOpen) {
+				currentMessage = GUI.TextField (new Rect(0,Screen.height-20,Screen.width,20),currentMessage);
 			}
 		}
 		for (int i=0;i<chat.Count;i++) {

@@ -16,8 +16,13 @@ public class HealthScript : MonoBehaviour {
 
 	public Vector3 startingPos;
 
+	public PlayerController parent;
+	public PlayerController lastHit;
+	public bool displayDeathMessage = true;
+
 	// Use this for initialization
 	void Start () {
+		parent = GetComponent<PlayerController>();
 		startingPos = transform.position;
 		if (health == 0) {
 			health = maxHealth;
@@ -40,15 +45,24 @@ public class HealthScript : MonoBehaviour {
 				}else{
 					Destroy (gameObject);
 				}
+				if (networkView.isMine) {
+					if (lastHit && displayDeathMessage) {
+						networkView.RPC ("GetDeath",RPCMode.All);
+						lastHit.networkView.RPC ("GetKill",RPCMode.All);
+						NetworkManager.current.networkView.RPC ("SendChat",RPCMode.All,parent.playerName + " was " + GlobalManager.current.killNouns[Random.Range (0,GlobalManager.current.killNouns.Length)] + " by " + lastHit.playerName + " using a " + lastHit.weaponScript.weaponName);
+					}
+				}
 			}
 		}
 	}
 
-	[RPC] void TakeDamage (float damage) {
+	[RPC] void TakeDamage (float damage, NetworkViewID shooterID) {
+		lastHit = NetworkView.Find (shooterID).GetComponent<PlayerController>();
 		if (armor > 0) {
 			armor -= damage;
 		}else{
 			health -= damage;
 		}
+
 	}
 }

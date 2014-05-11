@@ -40,7 +40,7 @@ public class GranadeScript : MonoBehaviour {
 				RaycastHit hit;
 				if (Physics.Raycast (newRay,out hit,range)) {
 					if (hit.collider.GetComponent<HealthScript>()) {
-						hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,bullet.damage);
+						hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,bullet.damage,bullet.parent.networkView.viewID);
 					}
 				}
 			}

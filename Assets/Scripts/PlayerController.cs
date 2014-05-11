@@ -1,9 +1,10 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public class PlayerController : MonoBehaviour {
 
-	//ADD A PEANUT BUTTER POWERUP AT SOME POINT IN DEVELOPMENT
+	public enum BonusType { Damage, Speed, Firerate, Health };
 
 	public HealthScript health;
 	public SpriteRenderer sprite;
@@ -20,15 +21,20 @@ public class PlayerController : MonoBehaviour {
 	public CharacterController cc;
 
 	//float damageMultiplier = 1f;
-	//float firerateMultiplier = 1f;
-	float speedMultiplier = 1f;
+	public float firerateMultiplier = 1f;
+	public float speedMultiplier = 1f;
 		
-	public float[] timers;
-	public string[] timerNames;
+	public List<float> timers;
+	public List<string> timerNames;
 	public Texture2D weaponTex;
 
 	public float reloadTime;
 	float maxReloadTime;
+
+	public int kills;
+	public int deaths;
+
+	public NetworkPlayer player;
 
 	// Use this for initialization
 	void Start () {
@@ -44,8 +50,8 @@ public class PlayerController : MonoBehaviour {
 			if (newWeapon) {
 				networkView.RPC ("ChangeWeapon",RPCMode.All,Network.AllocateViewID(),newWeapon.GetComponent<WeaponScript>().weaponIndex);
 			}
-			if (timers.Length > 0) {
-				for (int i=0;i<timers.Length;i++) {
+			if (timers.Count > 0) {
+				for (int i=0;i<timers.Count;i++) {
 					timers[i] -= Time.deltaTime;
 				}
 			}
@@ -59,11 +65,7 @@ public class PlayerController : MonoBehaviour {
 
 	void FixedUpdate () {
 		if (networkView.isMine) {
-			if (Input.GetAxis ("Vertical") > 0) {
-				transform.Rotate (0,0,-Input.GetAxis ("Horizontal") * turnSpeed * speedMultiplier * Time.fixedDeltaTime);
-			}else{
-				transform.Rotate (0,0,-Input.GetAxis ("Horizontal") * turnSpeed * speedMultiplier * Time.fixedDeltaTime);
-			}
+			transform.Rotate (0,0,-Input.GetAxis ("Horizontal") * turnSpeed * speedMultiplier * Time.fixedDeltaTime);
 			cc.Move (transform.right * Input.GetAxis ("Vertical") * speed * speedMultiplier * Time.fixedDeltaTime);
 			if (Input.GetButton ("Fire1")) {
 				weaponScript.Fire ();
@@ -72,8 +74,25 @@ public class PlayerController : MonoBehaviour {
 		}
 	}
 
+	void AddTimer (string tName) {
+		timers.Add (90);
+		timerNames.Add (tName);
+	}
+
 	[RPC] void ChangeName (string newName) {
 		playerName = newName;
+	}
+
+	[RPC] void GetPlayer (NetworkPlayer p) {
+		player = p;
+	}
+
+	[RPC] void GetKill () {
+		kills++;
+	}
+
+	[RPC] void GetDeath () {
+		deaths++;
 	}
 
 	[RPC] void ChangeWeapon (NetworkViewID newID, int newW) {
@@ -91,7 +110,7 @@ public class PlayerController : MonoBehaviour {
 		CancelInvoke ("ResetWeapon");
 		if (newW != 0) {
 			Invoke ("ResetWeapon",90f);
-			timers[0] = 90;
+			AddTimer (weaponScript.weaponName);
 		}
 	}
 
@@ -102,11 +121,17 @@ public class PlayerController : MonoBehaviour {
 	void ChangeSpeed (float factor) {
 		speedMultiplier = factor;
 		Invoke ("ResetSpeed",90f);
-		timers[1] = 90;
+		AddTimer ("Speed Bonus");
 	}
 
 	void ResetSpeed () {
 		speedMultiplier = 1f;
+	}
+
+	void ChangeFirerate (float factor) {
+		firerateMultiplier = factor;
+		Invoke ("ResetFirerate",90f);
+		AddTimer ("Firerate Bonus");
 	}
 
 	void OnDestroy () {
@@ -118,7 +143,7 @@ public class PlayerController : MonoBehaviour {
 	void OnGUI () {
 		if (networkView.isMine) {
 			int f = 0;
-			for (int i=0;i<timers.Length;i++) {
+			for (int i=0;i<timers.Count;i++) {
 				if (timers[i] > 0) {
 					float locValue = (timers[i]/90)*200;
 					GUI.Box (new Rect (Screen.width-locValue-10,Screen.height-55-(f*55),locValue,40),timerNames[i]);
@@ -131,9 +156,11 @@ public class PlayerController : MonoBehaviour {
 			}
 			GUI.Box (new Rect(135,Screen.height-55,reloadTime/maxReloadTime*200,40),"RELOAD");
 			GUI.Box (new Rect(135,Screen.height-110,health.health/health.maxHealth*200,40),"HULL");
+		}else{
+			Vector3 hudPos = Camera.main.WorldToScreenPoint (transform.position);
+			hudPos = new Vector3 (hudPos.x,-hudPos.y+Screen.height);
+			float barLength = ((playerName + (health.health/health.maxHealth*100).ToString()).Length+4)*8.5f;
+			GUI.Box (new Rect (hudPos.x-barLength/2,hudPos.y-40,barLength,20),playerName + " - " + (health.health/health.maxHealth*100).ToString() + "%");
 		}
-		Vector3 hudPos = Camera.main.WorldToScreenPoint (transform.position);
-		float barLength = playerName.Length*8.5f;
-		GUI.Box (new Rect (hudPos.x-barLength/2,hudPos.y-40,barLength,20),playerName);
 	}
 }
