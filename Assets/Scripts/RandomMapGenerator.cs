@@ -17,7 +17,7 @@ public class RandomMapGenerator : MonoBehaviour {
 
 	void Start () {
 		if (Network.isServer) {
-			networkView.RPC ("GenerateMap",RPCMode.All,(int)size.x,(int)size.y,Random.Range (0f,10000f),perlinScale,tolorance);
+			networkView.RPC ("GenerateMap",RPCMode.All,(int)size.x + (Network.connections.Length*10),(int)size.y + (Network.connections.Length*10),Random.Range (0f,10000f),perlinScale,tolorance);
 		}
 	}
 

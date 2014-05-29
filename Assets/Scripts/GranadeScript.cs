@@ -35,12 +35,15 @@ public class GranadeScript : MonoBehaviour {
 	void OnDestroy () {
 		if (Network.isServer) {
 			for (int i=0;i<fragments;i++) {
-				Vector3 randomDir = Random.insideUnitCircle * range;
+				Vector3 randomDir = Random.insideUnitCircle * range * 1.5f;
 				Ray newRay = new Ray (transform.position,randomDir);
 				RaycastHit hit;
 				if (Physics.Raycast (newRay,out hit,range)) {
-					if (hit.collider.GetComponent<HealthScript>()) {
-						hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,bullet.damage,bullet.parent.networkView.viewID);
+					if (hit.collider.tag == "Player") {
+						PlayerController hitPlayer = hit.collider.GetComponent<PlayerController>(); 
+						if ((hitPlayer.playerTeam == 0 || hitPlayer.playerTeam != bullet.parent.playerTeam) && hitPlayer != bullet.parent) {
+							hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,bullet.damage,bullet.parent.networkView.viewID);
+						}
 					}
 				}
 			}

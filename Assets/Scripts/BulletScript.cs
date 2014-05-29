@@ -8,7 +8,7 @@ public class BulletScript : MonoBehaviour {
 	public GameObject hitParticle;
 	public PlayerController parent;
 	public SpriteRenderer sprite;
-
+	public bool doNativeDamage = true;
 	public bool modifySize;
 	public bool piercing;
 	public bool homing;
@@ -30,13 +30,17 @@ public class BulletScript : MonoBehaviour {
 		Ray ray = new Ray (parent.weaponPos.position,velocity);
 		RaycastHit hit;
 		if (Network.isServer) {
-			if (Physics.Raycast (ray, out hit, 0.8f + velocity.magnitude * Time.fixedDeltaTime)) {
+			if (Physics.Raycast (ray, out hit, 1.6f + velocity.magnitude * Time.fixedDeltaTime)) {
 				if (hitParticle) { networkView.RPC ("Hit",RPCMode.All, hit.point); }
-				if (hit.collider.GetComponent<HealthScript>()) {
-					if (hit.collider.networkView) { hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,damage,parent.networkView.viewID); }
-				}
-				if (!piercing) {
-					Network.Destroy (gameObject);
+				PlayerController hitPlayer = hit.collider.GetComponent<PlayerController>();
+				Debug.Log (parent);
+				if ((hitPlayer.playerTeam == 0 || hitPlayer.playerTeam != parent.playerTeam) && hitPlayer != parent) {
+					if (hit.collider.GetComponent<HealthScript>()) {
+						hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,damage,parent.networkView.viewID);
+					}
+					if (!piercing) {
+						Network.Destroy (gameObject);
+					}
 				}
 			}
 		}
@@ -61,19 +65,29 @@ public class BulletScript : MonoBehaviour {
 			maxTime -= Time.fixedDeltaTime;
 			if (maxTime < 0) { Network.Destroy (gameObject); }
 			RaycastHit hit;
-			if (Physics.Raycast (ray, out hit, velocity.magnitude * Time.fixedDeltaTime)) {
-				if (hitParticle) { networkView.RPC ("Hit",RPCMode.All, hit.point); }
-				if (hit.collider.GetComponent<HealthScript>()) {
-					if (hit.collider.networkView) { hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,damage,parent.networkView.viewID); }
-				}
-				if (!piercing) {
-					Network.Destroy (gameObject);
-				}else{
-					damage -= damage*Time.fixedDeltaTime*20;
+			if (doNativeDamage) {
+				if (Physics.Raycast (ray, out hit, velocity.magnitude * Time.fixedDeltaTime)) {
+					if (hitParticle) { networkView.RPC ("Hit",RPCMode.All, hit.point); }
+					if (hit.collider.tag == "Player" || hit.collider.tag == "Bot") {
+						PlayerController hitPlayer = hit.collider.GetComponent<PlayerController>(); 
+						if ((hitPlayer.playerTeam == 0 || hitPlayer.playerTeam != parent.playerTeam) && hitPlayer != parent) {
+							if (hit.collider.GetComponent<HealthScript>()) {
+								hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,damage,parent.networkView.viewID);
+							}
+						}
+					}
+					if (!piercing) {
+						Network.Destroy (gameObject);
+					}else{
+						damage -= damage*Time.fixedDeltaTime*20;
+					}
 				}
 			}
 		}
 	}
+
+	//BOOM BOOM BOOM BOOM
+	//I'M GONNA FUCK A BROOM
 
 	[RPC] void Hit (Vector3 position) {
 		Instantiate (hitParticle,position+Vector3.back*2,transform.rotation);

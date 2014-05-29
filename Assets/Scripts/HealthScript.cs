@@ -27,6 +27,11 @@ public class HealthScript : MonoBehaviour {
 		if (health == 0) {
 			health = maxHealth;
 		}
+
+		if (GlobalManager.current.gameMode == GlobalManager.GameMode.SuddenDeath) {
+			maxHealth = 10;
+			health = 10;
+		}
 	}
 	
 	// Update is called once per frame
@@ -38,18 +43,25 @@ public class HealthScript : MonoBehaviour {
 			health = maxHealth;
 		}else{
 			if (health <= 0) {
-				if (debris) { Instantiate (debris,transform.position,Quaternion.identity); }
 				if (returnToStart) {
 					transform.position = startingPos;
 					health = maxHealth;
-				}else{
-					Destroy (gameObject);
 				}
-				if (networkView.isMine) {
+				if (debris) { Instantiate (debris,transform.position,Quaternion.identity); }
+				if (Network.isServer) {
+					if (!returnToStart) {
+						Network.Destroy (gameObject);
+					}
+					networkView.RPC ("GetDeath",RPCMode.All);
+					if (lastHit) {
+						lastHit.networkView.RPC ("GetKill",RPCMode.All,maxHealth + maxArmor);
+					}
 					if (lastHit && displayDeathMessage) {
-						networkView.RPC ("GetDeath",RPCMode.All);
-						lastHit.networkView.RPC ("GetKill",RPCMode.All);
-						NetworkManager.current.networkView.RPC ("SendChat",RPCMode.All,parent.playerName + " was " + GlobalManager.current.killNouns[Random.Range (0,GlobalManager.current.killNouns.Length)] + " by " + lastHit.playerName + " using a " + lastHit.weaponScript.weaponName);
+						if (lastHit.weaponScript.killNoun != "") {
+							NetworkManager.current.networkView.RPC ("SendChat",RPCMode.All,parent.playerName + " was " + lastHit.weaponScript.killNoun + " by " + lastHit.playerName + " using a " + lastHit.weaponScript.weaponName);
+						}else{
+							NetworkManager.current.networkView.RPC ("SendChat",RPCMode.All,parent.playerName + " was " + GlobalManager.current.killNouns[Random.Range (0,GlobalManager.current.killNouns.Length)] + " by " + lastHit.playerName + " using a " + lastHit.weaponScript.weaponName);
+						}
 					}
 				}
 			}
@@ -63,6 +75,5 @@ public class HealthScript : MonoBehaviour {
 		}else{
 			health -= damage;
 		}
-
 	}
 }

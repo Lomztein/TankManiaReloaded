@@ -6,14 +6,23 @@ public class MapData : MonoBehaviour {
 	public Vector2 size;
 	public Transform[] spawnPoints;
 
+	public string mapName;
+	public int maxPlayers;
+
+	public bool doSendData = true;
+	public bool PVEMap;
+
 	// Use this for initialization
 	void Start () {
-		Invoke ("SendData",0.1f);
+		if (doSendData) {
+			Invoke ("SendData",0.1f);
+		}
 	}
 	
 	void SendData () {
 		GlobalManager.current.mapSize = size;
 		GlobalManager.current.spawnPoints = spawnPoints;
+		GlobalManager.current.isPVE = PVEMap;
 	}
 
 	void OnDrawGizmos () {

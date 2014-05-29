@@ -9,6 +9,7 @@ public class PlayerController : MonoBehaviour {
 	public HealthScript health;
 	public SpriteRenderer sprite;
 	public string playerName = "Player";
+	public int playerTeam;
 
 	public float turnSpeed;
 	public float speed;
@@ -35,6 +36,14 @@ public class PlayerController : MonoBehaviour {
 	public int deaths;
 
 	public NetworkPlayer player;
+	public Transform colorSquare;
+
+	public bool isBot;
+
+	public int level;
+	public float experience;
+	public float expNeeded = 50;
+	public bool upgradeMenuOpen;
 
 	// Use this for initialization
 	void Start () {
@@ -42,11 +51,31 @@ public class PlayerController : MonoBehaviour {
 		health = GetComponent<HealthScript>();
 		cc = GetComponent<CharacterController>();
 		name = playerName;
+		if (!isBot) {
+			if (GlobalManager.current.gameMode == GlobalManager.GameMode.InstaGib) {
+				speed *= 3;
+				turnSpeed *= 3;
+			}
+			if (GlobalManager.current.gameMode == GlobalManager.GameMode.InstaGib && networkView.isMine) {
+				newWeapon = GlobalManager.current.instaGibCannon;
+				networkView.RPC ("SpawnInstaGibWeapon",RPCMode.All,Network.AllocateViewID ());
+			}
+			if (GlobalManager.current.gameMode == GlobalManager.GameMode.Berserk) {
+				firerateMultiplier = 0.5f;
+			}
+		}
+	}
+
+	[RPC] void LevelUp () {
+		level++;
+		float excess = expNeeded - experience;
+		experience = excess;
+		expNeeded *= 1.5f;
 	}
 	
 	// Update is called once per frame
 	void Update () {
-		if (networkView.isMine) {
+		if (networkView.isMine && !isBot) {
 			if (newWeapon) {
 				networkView.RPC ("ChangeWeapon",RPCMode.All,Network.AllocateViewID(),newWeapon.GetComponent<WeaponScript>().weaponIndex);
 			}
@@ -61,16 +90,32 @@ public class PlayerController : MonoBehaviour {
 				reloadTime = maxReloadTime;
 			}
 		}
+
+		if (Network.isServer) {
+			if (experience > expNeeded) {
+				networkView.RPC ("LevelUp",RPCMode.All);
+			}
+		}
+	}
+
+	void LateUpdate () {
+		if (colorSquare) {
+			colorSquare.rotation = Quaternion.identity;
+			colorSquare.position = transform.position;
+			colorSquare.localScale = sprite.bounds.extents/2;
+		}
 	}
 
 	void FixedUpdate () {
-		if (networkView.isMine) {
+		if (networkView.isMine && !isBot) {
 			transform.Rotate (0,0,-Input.GetAxis ("Horizontal") * turnSpeed * speedMultiplier * Time.fixedDeltaTime);
 			cc.Move (transform.right * Input.GetAxis ("Vertical") * speed * speedMultiplier * Time.fixedDeltaTime);
+			weaponScript.targetPos = Camera.main.ScreenToWorldPoint (Input.mousePosition);
 			if (Input.GetButton ("Fire1")) {
 				weaponScript.Fire ();
 			}
-			Camera.main.transform.position = transform.position + Vector3.back * 10;
+			Vector3 newPos = (transform.position + ((Camera.main.ScreenToWorldPoint (Input.mousePosition)-transform.position) / 3));
+			Camera.main.transform.position = new Vector3 (newPos.x,newPos.y,-10);
 		}
 	}
 
@@ -79,20 +124,57 @@ public class PlayerController : MonoBehaviour {
 		timerNames.Add (tName);
 	}
 
-	[RPC] void ChangeName (string newName) {
+	[RPC] void ChangeName (string newName, int newTeam) {
 		playerName = newName;
+		playerTeam = newTeam;
+		if (playerTeam != 0) {
+			GlobalManager.current.teamAmount[playerTeam-1]++;
+		}else{
+			GlobalManager.current.teamAmount[0]++;
+		}
+		if (!networkView.isMine) {
+			GameObject cs = (GameObject)Instantiate (GlobalManager.current.playerSquare,transform.position,Quaternion.identity);
+			colorSquare = cs.transform;
+			if (GlobalManager.current.localPlayer.playerTeam == playerTeam) {
+				cs.renderer.material.color = Color.green;
+				if (playerTeam == 0) {
+					cs.renderer.material.color = Color.clear;
+				}
+			}else{
+				cs.renderer.material.color = Color.red;
+			}
+		}
 	}
 
 	[RPC] void GetPlayer (NetworkPlayer p) {
 		player = p;
 	}
 
-	[RPC] void GetKill () {
+	[RPC] void GetKill (float exp) {
 		kills++;
+		if (GlobalManager.current.gameMode == GlobalManager.GameMode.GunGame) {
+			newWeapon = GlobalManager.current.weapons[weaponScript.weaponIndex + 1];
+		}
+		if (GlobalManager.current.isPVE) {
+			experience += exp;
+		}
 	}
 
 	[RPC] void GetDeath () {
 		deaths++;
+	}
+
+	[RPC] void SpawnInstaGibWeapon (NetworkViewID newID) {
+		if (weapon) { Destroy (weapon); }
+		weapon = (GameObject)Instantiate (GlobalManager.current.instaGibCannon,weaponPos.position,weaponPos.rotation);
+		weaponScript = weapon.GetComponent<WeaponScript>();
+		weaponScript.parent = this;
+		weaponScript.equipped = true;
+		weapon.transform.parent = transform;
+		weapon.networkView.viewID = newID;
+		maxReloadTime = weaponScript.reloadTime;
+		weaponTex = weapon.transform.FindChild ("Sprite").GetComponent<SpriteRenderer>().sprite.texture;
+		newWeapon = null;
 	}
 
 	[RPC] void ChangeWeapon (NetworkViewID newID, int newW) {
@@ -106,11 +188,15 @@ public class PlayerController : MonoBehaviour {
 		maxReloadTime = weaponScript.reloadTime;
 		weaponTex = weapon.transform.FindChild ("Sprite").GetComponent<SpriteRenderer>().sprite.texture;
 		newWeapon = null;
-
-		CancelInvoke ("ResetWeapon");
-		if (newW != 0) {
-			Invoke ("ResetWeapon",90f);
-			AddTimer (weaponScript.weaponName);
+		if (newW != 0 && networkView.isMine && !isBot) {
+			NetworkManager.current.networkView.RPC ("SendChat",RPCMode.All,playerName + " got their hands on a " + weaponScript.weaponName);
+		}
+		if (GlobalManager.current.gameMode != GlobalManager.GameMode.GunGame || GlobalManager.current.gameMode != GlobalManager.GameMode.InstaGib) {
+			CancelInvoke ("ResetWeapon");
+			if (newW != 0) {
+				Invoke ("ResetWeapon",90f);
+				AddTimer (weaponScript.weaponName);
+			}
 		}
 	}
 
@@ -136,12 +222,15 @@ public class PlayerController : MonoBehaviour {
 
 	void OnDestroy () {
 		if (networkView.isMine) {
-			NetworkManager.current.SpawnPlayer();
+			if (!isBot) {
+				NetworkManager.current.SpawnPlayer();
+			}
 		}
 	}
 
 	void OnGUI () {
-		if (networkView.isMine) {
+		GUI.skin = GlobalManager.current.skin;
+		if (networkView.isMine && !isBot) {
 			int f = 0;
 			for (int i=0;i<timers.Count;i++) {
 				if (timers[i] > 0) {
@@ -150,12 +239,12 @@ public class PlayerController : MonoBehaviour {
 					f++;
 				}
 			}
-			GUI.Box (new Rect(0,Screen.height-125,125,125),"");
+			GUI.Box (new Rect(0,Screen.height-125,125,125),"",GUI.skin.customStyles[1]);
 			if (weaponScript) {
 				GUI.DrawTexture (new Rect(10,Screen.height-110,100,100),weaponTex,ScaleMode.ScaleToFit,true,0);
 			}
 			GUI.Box (new Rect(135,Screen.height-55,reloadTime/maxReloadTime*200,40),"RELOAD");
-			GUI.Box (new Rect(135,Screen.height-110,health.health/health.maxHealth*200,40),"HULL");
+			GUI.Box (new Rect(135,Screen.height-110,health.health/100*200,40),"HULL");
 		}else{
 			Vector3 hudPos = Camera.main.WorldToScreenPoint (transform.position);
 			hudPos = new Vector3 (hudPos.x,-hudPos.y+Screen.height);

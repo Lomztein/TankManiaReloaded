@@ -4,6 +4,8 @@ using System.Collections.Generic;
 
 public class GlobalManager : MonoBehaviour {
 
+	public enum GameMode : int {Deathmatch, GunGame, SuddenDeath, InstaGib, Berserk};
+
 	public static GlobalManager current;
 	public int particleAmount;
 	public int maxParticles;
@@ -13,19 +15,37 @@ public class GlobalManager : MonoBehaviour {
 	public Vector2 mapSize;
 
 	public int mapIndex;
+	public GameMode gameMode;
 	public GameObject[] maps;
+	public MapData[] mapData;
 	public string[] killNouns;
+	public int teams;
+	public int[] teamAmount;
 
 	public GameObject curMap;
 
 	public PlayerController localPlayer;
 	public List<PlayerController> players;
 
+	public bool spawnWeapons = true;
+	public bool spawnBonuses = false;
+
+	public GameObject instaGibCannon;
+	public GameObject playerSquare;
+	public bool isPVE;
+
+	public GUISkin skin;
+	public bool debugMode;
+
 	// Use this for initialization
 	void Start () {
 		current = this;
 		for (int i=0;i<weapons.Length;i++) {
 			weapons[i].GetComponent<WeaponScript>().weaponIndex = i;
+		}
+		mapData = new MapData[maps.Length];
+		for (int i=0;i<maps.Length;i++) {
+			mapData[i] = maps[i].GetComponent<MapData>();
 		}
 	}
 
@@ -34,13 +54,19 @@ public class GlobalManager : MonoBehaviour {
 	}
 
 	void FixedUpdate () {
-		if (Network.isServer && NetworkManager.current.gameStarted) {
+		if (Network.isServer && NetworkManager.current.gameStarted && spawnWeapons) {
 			SpawnWeapon ();
 		}
 	}
 
-	[RPC] void LoadMap (int index) {
-		curMap = (GameObject)Instantiate (maps[index]);
+	[RPC] void LoadMap (int index, int gmIndex) {
+		mapIndex = index;
+		curMap = (GameObject)Instantiate (maps[mapIndex]);
+		gameMode = (GameMode)gmIndex;
+		if (gameMode == GameMode.GunGame || gameMode == GameMode.InstaGib) {
+			spawnWeapons = false;
+		}
+		teamAmount = new int[Mathf.Max (1,teams)];
 	}
 
 	[RPC] void GetPlayer (NetworkViewID playerID) {
@@ -69,34 +95,53 @@ public class GlobalManager : MonoBehaviour {
 	}
 
 	void OnGUI () {
+		GUI.skin = skin;
 		if (Network.isServer && NetworkManager.current.gameStarted == false) {
+			if (mapData[mapIndex].maxPlayers < Network.connections.Length+1) {
+				mapIndex = 0;
+			}
 			for (int i=0;i<maps.Length;i++) {
-				if (i != mapIndex) {
-					if (GUI.Button (new Rect (10,70 + (i*30),100,20),maps[i].name)) {
+				if (i != mapIndex && mapData[i].maxPlayers >= Network.connections.Length+1) {
+					if (GUI.Button (new Rect (10,70 + (i*30),100,20),mapData[i].mapName)) {
 						mapIndex = i;
 					}
 				}else{
 					GUI.Box (new Rect (10,70 + (i*30),100,20),maps[i].name);
 				}
 			}
-		}
-		if (Input.GetButton ("Tab") && NetworkManager.current.gameStarted) {
-			int n = 0;
-			for (int i=0;i<players.Count;i++) {
-				if (players[i]) {
-					n++;
-					string text = players[i].playerName + " - K/D: " + players[i].kills + " / " + players[i].deaths;
-					if (players[i] == localPlayer) {
-						text = "You -- " + text;
+			for (int i=0; i<System.Enum.GetValues(typeof(GameMode)).Length;i++) {
+				if ((int)gameMode != i) {
+					if (GUI.Button (new Rect(10,90+(20*maps.Length)+20+(i*30),100,20),((GameMode)i).ToString())) {
+						gameMode = (GameMode)i;
 					}
-					GUI.Box (new Rect (50,50 + (n*20), Screen.width-100,20),text);
-					if (Network.isServer && players[i].player != Network.player) {
-						if (GUI.Button (new Rect (Screen.width-150,50 + (n*20), 50, 20),"Kick")) {
-							Network.CloseConnection (players[i].player,true);
-						}
-					}
+				}else{
+					GUI.Box (new Rect(10,90+(20*maps.Length)+20+(i*30),100,20),((GameMode)i).ToString());
 				}
 			}
+		}
+		if (Input.GetButton ("Tab") && NetworkManager.current.gameStarted) {
+			int[] teamIndex = new int[teams];
+			int i = 0;
+			int a = 0;
+			do {
+				string text = "";
+				if (teams == 0) {
+					text = "Free for all";
+				}else{
+					text = "Team " + (i+1).ToString();
+				}
+				Vector2 distance = new Vector2 ((Screen.width-100-10*(teams-1))/(Mathf.Max (teams,1)),10);
+				GUI.Box (new Rect (50 + ((distance.x + distance.y) * i),50,distance.x,20),text);
+				int b = 0;
+				for (int j = 0;j<teamAmount[i];j++) {
+					if (players[a]) {
+						GUI.Box (new Rect (50 + ((distance.x + distance.y) * i), 80 + (20*b),distance.x,20),players[a].playerName + " - K/D: " + players[a].kills + " / " + players[a].deaths);
+						b++;
+					}
+					a++;
+				}
+				i++;
+			}while (i<teams);
 		}
 	}
 }

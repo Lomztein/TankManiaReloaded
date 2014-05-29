@@ -1,9 +1,9 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class PeanutButter : MonoBehaviour {
+public class BonusScript : MonoBehaviour {
 
-	public enum Type {Speed,Firerate};
+	public enum Type {Speed,Firerate,Damage,Health};
 	public Type type;
 
 	void OnTriggerEnter (Collider other) {
@@ -12,7 +12,13 @@ public class PeanutButter : MonoBehaviour {
 				other.SendMessage ("ChangeSpeed",3f,SendMessageOptions.DontRequireReceiver);
 			}
 			if (type == Type.Firerate) {
-				other.SendMessage ("ChangeFirerate",3f,SendMessageOptions.DontRequireReceiver);
+				other.SendMessage ("ChangeFirerate",0.5f,SendMessageOptions.DontRequireReceiver);
+			}
+			if (type == Type.Damage) {
+				other.SendMessage ("ChangeDamage",0.5f,SendMessageOptions.DontRequireReceiver);
+			}
+			if (type == Type.Health) {
+				other.SendMessage ("ChangeHealth",0.5f,SendMessageOptions.DontRequireReceiver);
 			}
 			networkView.RPC ("ActiveOnNetwork",RPCMode.All,false);
 		}

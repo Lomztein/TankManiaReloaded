@@ -6,9 +6,11 @@ public class WeaponScript : MonoBehaviour {
 	public SpriteRenderer sprite;
 	public int weaponIndex;
 	public string weaponName;
+	public string killNoun;
 	public float turnSpeed = 10;
 	public PlayerController parent;
 
+	public Vector3 targetPos;
 	public Transform[] muzzles;
 	public GameObject bulletType;
 	public float bulletSpeed;
@@ -51,12 +53,15 @@ public class WeaponScript : MonoBehaviour {
 		}else{
 			Destroy (collider);
 		}
+		if (GlobalManager.current.gameMode == GlobalManager.GameMode.InstaGib) {
+			turnSpeed *= 3;
+		}
 	}
 
 	void Update () {
 		if (transform.parent) {
 			if (transform.parent.networkView.isMine) {
-				Vector3 mousePos = Camera.main.ScreenToWorldPoint (Input.mousePosition);
+				Vector3 mousePos = targetPos;
 				float directionToMouse = Mathf.Atan2(mousePos.y-transform.position.y, mousePos.x-transform.position.x)*180 / Mathf.PI;
 				Quaternion dq = Quaternion.Euler(new Vector3(0,0,directionToMouse));
 				transform.rotation = Quaternion.RotateTowards(transform.rotation,dq,turnSpeed*Time.deltaTime);
