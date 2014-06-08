@@ -10,7 +10,7 @@ public class MapData : MonoBehaviour {
 	public int maxPlayers;
 
 	public bool doSendData = true;
-	public bool PVEMap;
+	public bool isPVE;
 
 	// Use this for initialization
 	void Start () {
@@ -22,7 +22,7 @@ public class MapData : MonoBehaviour {
 	void SendData () {
 		GlobalManager.current.mapSize = size;
 		GlobalManager.current.spawnPoints = spawnPoints;
-		GlobalManager.current.isPVE = PVEMap;
+		GlobalManager.current.isPVE = isPVE;
 	}
 
 	void OnDrawGizmos () {

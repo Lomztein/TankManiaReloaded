@@ -45,6 +45,9 @@ public class PlayerController : MonoBehaviour {
 	public float expNeeded = 50;
 	public bool upgradeMenuOpen;
 
+	public int credits;
+	public int score;
+
 	// Use this for initialization
 	void Start () {
 		sprite = transform.FindChild ("Sprite").GetComponent<SpriteRenderer>();
@@ -245,6 +248,7 @@ public class PlayerController : MonoBehaviour {
 			}
 			GUI.Box (new Rect(135,Screen.height-55,reloadTime/maxReloadTime*200,40),"RELOAD");
 			GUI.Box (new Rect(135,Screen.height-110,health.health/100*200,40),"HULL");
+			GUI.Label (new Rect (Screen.width-100,10,100,20),credits.ToString ());
 		}else{
 			Vector3 hudPos = Camera.main.WorldToScreenPoint (transform.position);
 			hudPos = new Vector3 (hudPos.x,-hudPos.y+Screen.height);

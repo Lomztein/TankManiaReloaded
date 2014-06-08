@@ -21,12 +21,12 @@ public class InvasionBotController : MonoBehaviour {
 		networkView.RPC ("ChangeWeapon",RPCMode.All,Network.AllocateViewID (),newWeaponID);
 		con = GetComponent<PlayerController>();
 		health = GetComponent<HealthScript>();
-		health.maxHealth = Mathf.Max (InvasionGameMode.current.gameProgress/3,20);
+		health.maxHealth = 20+InvasionGameMode.current.gameProgress/10;
 		health.health = health.maxHealth;
 		range = con.weaponScript.bulletSpeed;
 		name = con.weaponScript.weaponName + " Tank";
 		con.playerName = name;
-		if (Random.Range (0,11) == 1) {
+		if (Random.Range (1,3) == 1) {
 			leftHanded = true;
 		}
 	}
@@ -102,6 +102,9 @@ public class InvasionBotController : MonoBehaviour {
 			if (Random.Range (0,4) == 3) {
 				Network.Instantiate (GlobalManager.current.weapons[Random.Range (0,GlobalManager.current.weapons.Length)],transform.position,Quaternion.identity,0);
 			}
+		}
+		if (health.lastHit = GlobalManager.current.localPlayer) {
+			GlobalManager.current.localPlayer.credits += (int)(health.maxHealth + newWeaponID * 5);
 		}
 	}
 }

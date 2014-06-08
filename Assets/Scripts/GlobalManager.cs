@@ -10,6 +10,7 @@ public class GlobalManager : MonoBehaviour {
 	public int particleAmount;
 	public int maxParticles;
 	public GameObject[] weapons;
+	public WeaponScript[] weaponData;
 	public Transform[] spawnPoints;
 	public float weaponSpawnChance = 1;
 	public Vector2 mapSize;
@@ -40,8 +41,21 @@ public class GlobalManager : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		current = this;
+		weaponData = new WeaponScript[weapons.Length];
 		for (int i=0;i<weapons.Length;i++) {
-			weapons[i].GetComponent<WeaponScript>().weaponIndex = i;
+			float newCost = 0;
+			WeaponScript weapon = weapons[i].GetComponent<WeaponScript>();
+			weapon.weaponIndex = i;
+			newCost = weapon.bulletDamage * weapon.bulletAmount;
+			if (weapon.fireInSequence) {
+				newCost *= weapon.transform.childCount-1;
+			}
+			newCost /= weapon.reloadTime;
+			newCost *= ((weapon.bulletSpeed*5)+weapon.turnSpeed)/5;
+			newCost -= weapon.bulletInaccuracy * 10;
+			newCost *= 3;
+			weapon.cost = ((int)(newCost/250))*250;
+			weaponData[i] = weapon;
 		}
 		mapData = new MapData[maps.Length];
 		for (int i=0;i<maps.Length;i++) {
@@ -120,7 +134,6 @@ public class GlobalManager : MonoBehaviour {
 			}
 		}
 		if (Input.GetButton ("Tab") && NetworkManager.current.gameStarted) {
-			int[] teamIndex = new int[teams];
 			int i = 0;
 			int a = 0;
 			do {

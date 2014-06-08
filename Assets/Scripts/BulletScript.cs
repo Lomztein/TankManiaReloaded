@@ -33,7 +33,6 @@ public class BulletScript : MonoBehaviour {
 			if (Physics.Raycast (ray, out hit, 1.6f + velocity.magnitude * Time.fixedDeltaTime)) {
 				if (hitParticle) { networkView.RPC ("Hit",RPCMode.All, hit.point); }
 				PlayerController hitPlayer = hit.collider.GetComponent<PlayerController>();
-				Debug.Log (parent);
 				if ((hitPlayer.playerTeam == 0 || hitPlayer.playerTeam != parent.playerTeam) && hitPlayer != parent) {
 					if (hit.collider.GetComponent<HealthScript>()) {
 						hit.collider.networkView.RPC ("TakeDamage",RPCMode.All,damage,parent.networkView.viewID);

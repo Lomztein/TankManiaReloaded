@@ -32,6 +32,8 @@ public class WeaponScript : MonoBehaviour {
 	public Transform target;
 	public GameObject targetSprite;
 
+	public int cost;
+
 	// Use this for initialization
 	void Start () {
 		if (findTarget) {
